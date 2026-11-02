@@ -1,0 +1,15 @@
+import { chromium } from 'playwright'
+const b = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader'] })
+const errs=[]
+const p = await (await b.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: 'dark' })).newPage()
+p.on('pageerror', e => errs.push(e.message)); p.on('console', m => m.type()==='error' && errs.push(m.text()))
+await p.goto('http://localhost:5180/?demo=1'); await p.waitForSelector('canvas'); await p.waitForTimeout(5000)
+const box = await p.locator('canvas').boundingBox()
+await p.mouse.move(box.x+box.width/2, box.y+box.height/2); await p.mouse.down(); await p.mouse.move(box.x+box.width/2+120, box.y+box.height/2+160, {steps:10}); await p.mouse.up(); await p.waitForTimeout(1500)
+await p.screenshot({ path: 'screenshots/threejs-demo-1440x900.png' })
+await p.getByRole('button',{name:'Reset view'}).click(); await p.waitForTimeout(1500)
+await p.screenshot({ path: 'screenshots/threejs-demo-reset-1440x900.png' })
+await p.getByRole('tab',{name:'Diagram'}).click(); await p.waitForTimeout(500); await p.getByRole('button',{name:/Silicon die/}).click(); await p.screenshot({ path: 'screenshots/diagram-generic-1440x900.png' })
+const plain = await (await b.newContext()).newPage(); await plain.goto('http://localhost:5180/'); await plain.waitForTimeout(1500)
+console.log('demo hidden w/o param:', !(await plain.content()).includes('Demo: procedural'), 'iframe:', await plain.locator('iframe').count())
+console.log('errors', errs); await b.close()
