@@ -5,6 +5,8 @@ import { GenericPackage, LabeledImage, explicitPkg, type DiagramData } from './D
 type Chip = { id: string; name: string; year: string | number | null; category: string; chip: string; tier: string
   embedUrl: string; sourceUrl: string; license: string; safe: boolean; author: string; logo: boolean; modelUrl: string | null; visualScore: number; diagram?: DiagramData }
 const Viewer3D = lazy(() => import('./Viewer3D'))
+const ViewerBoundary = lazy(() => import('./Viewer3D').then(m => ({ default: m.ViewerBoundary })))
+const NO_WEBGL_MSG = "3D needs WebGL, which isn't available in this browser. Showing the diagram instead."
 const showDemo = import.meta.env.DEV || new URLSearchParams(location.search).has('demo')
 // Dev/test-only entry: a procedural mesh built in code, not a catalog item.
 const demo: Chip = { id: 'demo-procedural-cpu', name: 'Demo: procedural CPU package (built in code)', year: null, category: 'Demo', chip: 'Demo (generic LGA package)', tier: 'current',
@@ -26,7 +28,9 @@ export default function App() {
   useEffect(() => { if (!list.find(i => i.id === selId)) setSelId(list[0]?.id ?? null) }, [list, selId])
   useEffect(() => { if (cat && !cats.includes(cat)) setCat('') }, [cats, cat])
   const sel = items.find(i => i.id === selId)
+  const [noGL, setNoGL] = useState(false)
   const [tab, setTab] = useState<'3d' | 'diagram'>('3d')
+  const onNoWebGL = () => { setNoGL(true); setTab('diagram') }
   const btn = (on: boolean) => `px-3 py-1.5 text-sm rounded-md border ${on ? 'bg-fg text-bg border-fg' : 'border-border text-muted hover:text-fg'}`
 
   return (
@@ -76,9 +80,10 @@ export default function App() {
               <button role="tab" aria-selected={tab === '3d'} className={btn(tab === '3d')} onClick={() => setTab('3d')}>3D model</button>
               <button role="tab" aria-selected={tab === 'diagram'} className={btn(tab === 'diagram')} onClick={() => setTab('diagram')}>Diagram</button>
             </div>
+            {noGL && <p role="status" className="text-sm text-warn border border-warn/40 rounded px-3 py-2">{NO_WEBGL_MSG}</p>}
             {tab === 'diagram' ? <div role="tabpanel">{sel.diagram ? <LabeledImage d={sel.diagram} /> : <GenericPackage key={sel.id} initial={explicitPkg(`${sel.category} ${sel.name}`)} />}</div> :
             <div role="tabpanel" className="aspect-video w-full bg-card border border-border rounded-lg overflow-hidden">
-              {sel.modelUrl ? <Suspense fallback={<p role="status" className="p-4 text-sm text-muted">Loading 3D viewer…</p>}><Viewer3D key={sel.id} modelUrl={sel.modelUrl} label={sel.name} /></Suspense> : <iframe key={sel.id} title={`3D model: ${sel.name}`} src={sel.embedUrl} className="w-full h-full" loading="lazy"
+              {sel.modelUrl ? <Suspense fallback={<p role="status" className="p-4 text-sm text-muted">Loading 3D viewer…</p>}><ViewerBoundary resetKey={sel.id} onError={e => { if (e.name === 'NoWebGLError' || /WebGL/i.test(e.message)) onNoWebGL() }}><Viewer3D key={sel.id} modelUrl={sel.modelUrl} label={sel.name} onNoWebGL={onNoWebGL} /></ViewerBoundary></Suspense> : <iframe key={sel.id} title={`3D model: ${sel.name}`} src={sel.embedUrl} className="w-full h-full" loading="lazy"
                 allow="autoplay; fullscreen; xr-spatial-tracking" allowFullScreen />}
             </div>}
             <div>
